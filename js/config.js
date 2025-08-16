@@ -119,6 +119,43 @@ const API_SITES = {
         name: '空内容测试源',
         adult: true
     },
+    ckzy: {
+        api: 'https://ckzy.me/api.php/provide/vod/?ac=list',
+        name: 'CK资源',
+        adult: true
+    },
+    jkun: {
+        api: 'https://www.jkunzyapi.com/api.php/provide/vod/',
+        name: 'jkun资源',
+        adult: true
+    },
+    bwzy: {
+       api: 'https://api.bwzyz.com/api.php/provide/vod/at/json/',
+       name: '百万资源',
+       adult: true
+    },
+    souav: {
+       api: 'https://api.souavzy.vip/api.php/provide/vod/at/json',
+       name: 'souav资源',
+       adult: true
+    },
+    r155: {
+       api: 'https://155api.com/api.php/provide/vod',
+       name: '155资源',
+       adult: true
+    },
+    },
+    huangcang: {
+        api: 'https://hsckzy888.com/api.php/provide/vod/at/json/',
+        name: '黄色仓库',
+        adult: true,
+        detail: 'https://hsckzy.vip'
+    },
+    yutu: {
+        api: 'https://apiyutu.com/api.php/provide/vod/?ac=list',
+        name: '玉兔资源',
+        adult: true
+    },
 };
 
 // 定义合并方法
