@@ -23,3 +23,6 @@ export async function onRequestPost(context) {
     headers: { "Content-Type": "text/event-stream" }
   });
 }
+if (request.headers.get("Host") !== "mm.dhxlsfn.dpdns.org") {
+    return new Response("Unauthorized", { status: 401 });
+}
