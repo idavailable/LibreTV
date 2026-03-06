@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LibreTV AI - 最终修复版</title>
+    <title>LibreTV AI</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css" id="hl-dark" disabled>
@@ -27,7 +27,8 @@
         .logo { font-size: 18px; font-weight: 800; color: var(--accent); }
         .theme-btn { cursor: pointer; font-size: 18px; opacity: 0.7; }
         
-        .new-btn { border: 1px solid var(--border); padding: 10px; border-radius: 8px; cursor: pointer; text-align: center; margin-bottom: 20px; background: var(--bg); font-weight: 600; color: var(--text); }
+        .new-btn { border: 1px solid var(--border); padding: 10px; border-radius: 8px; cursor: pointer; text-align: center; margin-bottom: 20px; background: var(--bg); font-weight: 600; color: var(--text); transition: 0.2s; }
+        .new-btn:hover { background: var(--history-hover); }
         
         #history-list { flex: 1; overflow-y: auto; }
         .history-item { 
@@ -37,7 +38,7 @@
         }
         .history-item:hover { background: var(--history-hover); }
         .history-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-        .del-icon { opacity: 0; color: #ff4d4f; font-size: 14px; padding: 2px 6px; transition: 0.2s; }
+        .del-icon { opacity: 0; color: #ff4d4f; font-size: 14px; padding: 2px 6px; transition: 0.2s; cursor: pointer; }
         .history-item:hover .del-icon { opacity: 1; }
 
         /* --- 主内容区 --- */
@@ -45,14 +46,13 @@
         #scroller { flex: 1; overflow-y: auto; width: 100%; display: block; }
         .msg-list { max-width: 850px; margin: 0 auto; width: 92%; padding-bottom: 160px; }
 
-        /* 解决竖排字：隔离块布局 */
         .msg-row { width: 100%; padding: 25px 0; border-bottom: 1px solid var(--border); display: block; clear: both; overflow: hidden; }
         .avatar { width: 34px; height: 34px; border-radius: 4px; float: left; margin-right: 18px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #fff; }
         .ai-avatar { background: var(--accent); }
         .user-avatar { background: #5436DA; }
 
         .content { 
-            display: block; overflow: hidden; /* 核心：触发BFC占满余下宽度 */
+            display: block; overflow: hidden; 
             min-width: 200px; line-height: 1.7; font-size: 16px; word-wrap: break-word; 
         }
         .content p { margin: 0 0 1em 0; width: 100%; }
@@ -88,7 +88,7 @@
         <div class="msg-list" id="msg-box">
             <div class="msg-row">
                 <div class="avatar ai-avatar">R</div>
-                <div class="content">布局已锁定。点击侧边栏对话旁的 🗑️ 可删除历史。</div>
+                <div class="content">系统已就绪。所有历史记录现已支持完整载入。</div>
             </div>
         </div>
     </div>
@@ -114,14 +114,13 @@
     window.onload = loadHistory;
 
     function toggleTheme() {
-        const b = document.body;
-        const isDark = b.hasAttribute('data-theme');
+        const isDark = document.body.hasAttribute('data-theme');
         if (isDark) {
-            b.removeAttribute('data-theme');
+            document.body.removeAttribute('data-theme');
             document.getElementById('hl-light').disabled = false;
             document.getElementById('hl-dark').disabled = true;
         } else {
-            b.setAttribute('data-theme', 'dark');
+            document.body.setAttribute('data-theme', 'dark');
             document.getElementById('hl-light').disabled = true;
             document.getElementById('hl-dark').disabled = false;
         }
@@ -131,7 +130,7 @@
         if(input.files[0]) {
             selectedFile = input.files[0];
             const tag = document.getElementById('file-tag');
-            tag.innerText = "📁 待发送: " + selectedFile.name;
+            tag.innerText = "📁 待上传: " + selectedFile.name;
             tag.style.display = "block";
         }
     }
@@ -150,11 +149,11 @@
         } catch (e) {}
     }
 
-    // --- 历史记录：完整载入（核心修复） ---
+    // --- 历史记录：完整载入 (关键修复) ---
     async function loadChat(chatId) {
         currentId = chatId;
         const box = document.getElementById('msg-box');
-        box.innerHTML = '<div style="padding:40px;text-align:center;opacity:0.5">正在同步完整历史...</div>';
+        box.innerHTML = '<div style="padding:40px;text-align:center;opacity:0.5">正在提取云端完整记录...</div>';
         try {
             const res = await fetch('/history', { 
                 method: 'POST', 
@@ -162,9 +161,13 @@
                 body: JSON.stringify({ chatId }) 
             });
             const data = await res.json();
-            messages = data.messages || []; // 完整载入历史消息数组
+            
+            // 核心修复：清空旧对话并重新载入
+            messages = data.messages || []; 
             box.innerHTML = '';
+            
             messages.forEach(msg => {
+                // 如果是 AI 且包含思考过程，先渲染思考框
                 if(msg.role === 'assistant' && msg.reasoning_content) {
                     appendReasoning(msg.reasoning_content);
                 }
@@ -174,10 +177,10 @@
         } catch (e) { box.innerHTML = "历史载入失败"; }
     }
 
-    // --- 历史记录：删除功能 ---
+    // --- 历史记录：物理删除 ---
     async function deleteChat(event, chatId) {
-        event.stopPropagation(); // 阻止触发 loadChat
-        if(!confirm("确定要删除这条对话吗？")) return;
+        event.stopPropagation(); 
+        if(!confirm("确定要永久删除这条对话吗？")) return;
         try {
             const res = await fetch('/history', {
                 method: 'DELETE',
@@ -188,7 +191,7 @@
                 if(currentId === chatId) startNew();
                 loadHistory();
             }
-        } catch(e) { alert("删除操作失败"); }
+        } catch(e) { alert("删除失败"); }
     }
 
     function doAction() {
@@ -212,8 +215,8 @@
                 const res = await fetch('/upload', { method: 'POST', body: fd });
                 const fData = await res.json();
                 if (fData.isText) {
-                    aiPrompt = `[文件内容:${fData.name}]\n${fData.content}\n\n问题:${text}`;
-                    displayTxt += `\n\n📄 _已分析文件: ${fData.name}_`;
+                    aiPrompt = `[文件:${fData.name}]\n${fData.content}\n\n问题:${text}`;
+                    displayTxt += `\n\n📄 _文件已读: ${fData.name}_`;
                 }
             } catch(e) {}
             selectedFile = null;
@@ -247,8 +250,7 @@
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n');
+                const lines = decoder.decode(value).split('\n');
                 for (const line of lines) {
                     if (line.startsWith('data: ') && line !== 'data: [DONE]') {
                         try {
@@ -277,7 +279,7 @@
             messages.push({ role: "assistant", content: fullText, reasoning_content: reasoningText });
             loadHistory();
         } catch (e) {
-            if (e.name === 'AbortError') aiDiv.innerHTML += " [停止]";
+            if (e.name === 'AbortError') aiDiv.innerHTML += " [已停止]";
         } finally {
             document.getElementById('send-btn').innerText = '发送';
             controller = null;
@@ -303,7 +305,7 @@
     function appendReasoning(text) {
         const div = document.createElement('div');
         div.className = 'msg-row';
-        div.innerHTML = `<div class="reasoning"><b>🤔 思考过程:</b><div>${text}</div></div>`;
+        div.innerHTML = `<div class="reasoning"><b>🤔 历史思考:</b><div>${text}</div></div>`;
         document.getElementById('msg-box').appendChild(div);
     }
 
