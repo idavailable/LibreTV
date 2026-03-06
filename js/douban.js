@@ -510,39 +510,42 @@ function renderDoubanCards(data, container) {
         emptyEl.innerHTML = `<div class="text-pink-500">❌ 暂无数据，请尝试其他分类或刷新</div>`;
         fragment.appendChild(emptyEl);
     } else {
-        data.subjects.forEach(item => {
-            const card = document.createElement("div");
-            card.className = "bg-[#111] hover:bg-[#222] transition-all duration-300 rounded-lg overflow-hidden flex flex-col transform hover:scale-105 shadow-md hover:shadow-lg";
-            
-            const safeTitle = item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-            const safeRate = (item.rate || "暂无").replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            
-            // --- 核心修复：彻底解决 403 问题的图片处理逻辑 ---
-            let originalCoverUrl = item.cover ? item.cover.trim() : "";
-            
-const cleanUrl = originalCoverUrl.replace(/^https?:/, ''); 
+// 重新精准修改后的图片逻辑
+data.subjects.forEach(item => {
+    const card = document.createElement("div");
+    card.className = "bg-[#111] hover:bg-[#222] transition-all duration-300 rounded-lg overflow-hidden flex flex-col transform hover:scale-105 shadow-md hover:shadow-lg";
+    
+    const safeTitle = item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const safeRate = (item.rate || "暂无").replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    // 使用新的图片代理地址 (针对 2026 年优化的节点)
+    let originalCoverUrl = item.cover ? item.cover.trim() : "";
+    
+    // 方案：使用百度或 WordPress 的更隐蔽代理，这两个目前不会报 418/400 错误
+    const cleanUrl = originalCoverUrl.replace(/^https?:\/\//, '');
+    const finalImgUrl = `https://i0.wp.com/${cleanUrl}?strip=all&quality=80`;
 
-card.innerHTML = `
-    <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
-        <img src="${cleanUrl}" alt="${safeTitle}" 
-            class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-            onerror="this.src='image/logo.png';" 
-            loading="lazy">
-                    <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
-                    <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
-                        <span class="text-yellow-400">★</span> ${safeRate}
-                    </div>
-                </div>
-                <div class="p-2 text-center bg-[#111]">
-                    <button onclick="fillAndSearchWithDouban('${safeTitle}')" 
-                            class="text-sm font-medium text-white truncate w-full hover:text-pink-400 transition"
-                            title="${safeTitle}">
-                        ${safeTitle}
-                    </button>
-                </div>
-            `;
-            fragment.appendChild(card);
-        });
+    card.innerHTML = `
+        <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
+            <img src="${finalImgUrl}" alt="${safeTitle}" 
+                class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+                onerror="this.src='image/logo.png';" 
+                loading="lazy">
+            <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
+            <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
+                <span class="text-yellow-400">★</span> ${safeRate}
+            </div>
+        </div>
+        <div class="p-2 text-center bg-[#111]">
+            <button onclick="fillAndSearchWithDouban('${safeTitle}')" 
+                    class="text-sm font-medium text-white truncate w-full hover:text-pink-400 transition"
+                    title="${safeTitle}">
+                ${safeTitle}
+            </button>
+        </div>
+    `;
+    fragment.appendChild(card);
+});
     }
     container.innerHTML = "";
     container.appendChild(fragment);
