@@ -19,7 +19,7 @@
         .new-btn { border: 1px solid var(--border); padding: 10px; border-radius: 8px; cursor: pointer; text-align: center; margin-bottom: 20px; background: var(--bg); font-weight: 600; transition: 0.2s; }
         .new-btn:hover { background: var(--history-hover); }
         #history-list { flex: 1; overflow-y: auto; }
-        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-bottom: 5px; transition: 0.2s; position: relative; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-bottom: 5px; transition: 0.2s; }
         .history-item:hover { background: var(--history-hover); }
         .history-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
         .del-icon { opacity: 0; color: #ff4d4f; padding: 2px 6px; cursor: pointer; font-style: normal; }
@@ -43,7 +43,10 @@
 </head>
 <body>
 <div class="sidebar">
-    <div class="side-head"><div class="logo">LibreTV AI</div><div style="cursor:pointer" onclick="toggleTheme()">🌓</div></div>
+    <div class="side-head">
+        <div class="logo">LibreTV AI</div>
+        <div style="cursor:pointer; font-size: 20px;" onclick="toggleTheme()">🌓</div>
+    </div>
     <div class="new-btn" onclick="startNew()">+ 开启新对话</div>
     <div id="history-list"></div>
 </div>
@@ -67,7 +70,7 @@
     let controller = null;
     let selectedFile = null;
 
-    // --- 鉴权核心逻辑开始 ---
+    // --- 鉴权头获取逻辑 ---
     const getAuthHeaders = () => {
         const getCookie = (name) => {
             const value = `; ${document.cookie}`;
@@ -82,22 +85,29 @@
     };
 
     const handleAuthError = (res) => {
-        if (res.status === 401) {
-            window.location.href = "/login.html";
-            return true;
-        }
+        if (res.status === 401) { window.location.href = "/login.html"; return true; }
         return false;
     };
-    // --- 鉴权核心逻辑结束 ---
 
-    window.onload = () => { loadHistory(); startNew(); };
-
+    // --- 主题记忆与切换 ---
     function toggleTheme() {
         const isDark = document.body.toggleAttribute('data-theme');
-        document.getElementById('hl-light').disabled = isDark;
-        document.getElementById('hl-dark').disabled = !isDark;
+        const lightStyle = document.getElementById('hl-light');
+        const darkStyle = document.getElementById('hl-dark');
+        if (lightStyle && darkStyle) {
+            lightStyle.disabled = isDark;
+            darkStyle.disabled = !isDark;
+        }
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
     }
 
+    window.onload = () => {
+        if (localStorage.getItem('theme') === 'dark') toggleTheme();
+        loadHistory(); 
+        startNew(); 
+    };
+
+    // --- 文件处理 ---
     function onFile(input) {
         if(input.files[0]) {
             selectedFile = input.files[0];
@@ -106,6 +116,7 @@
         }
     }
 
+    // --- 历史记录 ---
     async function loadHistory() {
         const res = await fetch('/history', { headers: getAuthHeaders() });
         if (handleAuthError(res)) return;
@@ -123,14 +134,8 @@
         currentId = chatId;
         const box = document.getElementById('msg-box');
         box.innerHTML = '<div style="padding:40px;text-align:center;opacity:0.5">加载中...</div>';
-        
-        const res = await fetch('/history', { 
-            method: 'POST', 
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ chatId }) 
-        });
+        const res = await fetch('/history', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ chatId }) });
         if (handleAuthError(res)) return;
-        
         const data = await res.json();
         messages = data.messages || [];
         box.innerHTML = '';
@@ -143,17 +148,14 @@
 
     async function deleteChat(e, chatId) {
         e.stopPropagation();
-        if(!confirm("删除记录？")) return;
-        const res = await fetch('/history', { 
-            method: 'DELETE', 
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ chatId }) 
-        });
+        if(!confirm("确定要删除这段对话吗？")) return;
+        const res = await fetch('/history', { method: 'DELETE', headers: getAuthHeaders(), body: JSON.stringify({ chatId }) });
         if (handleAuthError(res)) return;
         if(currentId === chatId) startNew();
         loadHistory();
     }
 
+    // --- 核心对话逻辑 ---
     function doAction() {
         if (document.getElementById('send-btn').innerText === '发送') send();
         else if (controller) controller.abort();
@@ -168,12 +170,7 @@
         if (selectedFile) {
             const fd = new FormData();
             fd.append('file', selectedFile);
-            // 注意：upload 接口通常使用 FormData，Header 设置略有不同
-            const fRes = await fetch('/upload', { 
-                method:'POST', 
-                headers: { 'X-Password': getAuthHeaders()['X-Password'] }, // 仅传密码，让浏览器自动设 Boundary
-                body: fd 
-            });
+            const fRes = await fetch('/upload', { method:'POST', headers: { 'X-Password': getAuthHeaders()['X-Password'] }, body: fd });
             if (handleAuthError(fRes)) return;
             const fData = await fRes.json();
             messages.push({ role: "user", content: `[文件: ${fData.name}]\n${fData.content}\n\n问题: ${text}` });
@@ -200,7 +197,6 @@
                 body: JSON.stringify({ messages, chatId: currentId }),
                 signal: controller.signal
             });
-            
             if (handleAuthError(res)) return;
 
             const reader = res.body.getReader();
@@ -229,11 +225,15 @@
                 scrollDown();
             }
             messages.push({ role: "assistant", content: fullAI, reasoning_content: fullReasoning });
-            loadHistory();
+            
+            // 【优化点】延迟刷新列表：等待 R2 写入索引生效 (1秒)
+            setTimeout(() => { loadHistory(); }, 1000);
+
         } catch (e) { if(e.name==='AbortError') aiDiv.innerHTML += " [已停止]"; }
         finally { document.getElementById('send-btn').innerText = '发送'; controller = null; }
     }
 
+    // --- UI 渲染辅助 ---
     function appendRow(role, text) {
         const row = document.createElement('div');
         row.className = 'msg-row';
@@ -241,7 +241,6 @@
         document.getElementById('msg-box').appendChild(row);
         return row;
     }
-
     function createAiRow() {
         const row = document.createElement('div');
         row.className = 'msg-row';
@@ -249,7 +248,6 @@
         document.getElementById('msg-box').appendChild(row);
         return row;
     }
-
     function appendReasoning(text) {
         const div = document.createElement('div');
         div.className = 'reasoning';
@@ -257,15 +255,12 @@
         document.getElementById('msg-box').appendChild(div);
         return div;
     }
-
     function startNew() {
         currentId = "chat_" + Date.now();
         messages = [];
         document.getElementById('msg-box').innerHTML = '<div class="msg-row"><div class="avatar ai-avatar">R</div><div class="content">你好，我是 LibreTV AI，今天想聊点什么？</div></div>';
     }
-
     function scrollDown() { document.getElementById('scroller').scrollTop = document.getElementById('scroller').scrollHeight; }
-
     document.getElementById('userInput').oninput = function() { this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'; };
 </script>
 </body>
