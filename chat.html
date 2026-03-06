@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LibreTV AI - Professional</title>
+    // 每次刷新页面或点击“新对话”都会产生新 ID
+     let currentChatId = "chat_" + Date.now();
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -127,11 +129,14 @@
         let fullText = "", reasoningText = "", reasoningDiv = null;
 
         try {
-            const response = await fetch('/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messages: messages })
-            });
+        const response = await fetch('/chat', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ 
+              messages: messages, 
+              chatId: currentChatId  // 关键：传给后端用于文件名
+            })
+          });
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
