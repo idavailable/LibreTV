@@ -1,28 +1,22 @@
-import { sha256 } from '../js/sha256.js';
+// 修改后的拦截逻辑
+const protectedPaths = [
+    "/chat", "/history", "/upload", 
+    "/index.html", "/about.html", "/daohang.html", 
+    "/iptv.html", "/m3uplayer.html", "/net.html",
+    "/" // 根目录
+];
 
-export async function onRequest(context) {
-  const { request, env, next } = context;
-  const response = await next();
-  const contentType = response.headers.get("content-type") || "";
-  
-  if (contentType.includes("text/html")) {
-    let html = await response.text();
-    
-    // 处理普通密码
-    const password = env.PASSWORD || "";
-    let passwordHash = "";
-    if (password) {
-      passwordHash = await sha256(password);
+if (password && protectedPaths.some(p => url.pathname.startsWith(p))) {
+    // 检查 Cookie 或 Header
+    const userPassword = request.headers.get("X-Password") || getCookie(request, "auth_hash");
+    const passwordHash = await sha256(password);
+
+    if (userPassword !== passwordHash) {
+        // 如果是 HTML 请求，重定向到登录页（假设你有 login.html）
+        if (url.pathname.endsWith(".html") || url.pathname === "/") {
+            return Response.redirect(new URL("/login.html", request.url), 302);
+        }
+        // 如果是接口请求，返回 401
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
     }
-    html = html.replace('window.__ENV__.PASSWORD = "{{PASSWORD}}";', 
-      `window.__ENV__.PASSWORD = "${passwordHash}";`);
-    
-    return new Response(html, {
-      headers: response.headers,
-      status: response.status,
-      statusText: response.statusText,
-    });
-  }
-  
-  return response;
 }
