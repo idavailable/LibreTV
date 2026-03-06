@@ -19,10 +19,10 @@
         .new-btn { border: 1px solid var(--border); padding: 10px; border-radius: 8px; cursor: pointer; text-align: center; margin-bottom: 20px; background: var(--bg); font-weight: 600; transition: 0.2s; }
         .new-btn:hover { background: var(--history-hover); }
         #history-list { flex: 1; overflow-y: auto; }
-        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-bottom: 5px; transition: 0.2s; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-bottom: 5px; transition: 0.2s; position: relative; }
         .history-item:hover { background: var(--history-hover); }
         .history-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-        .del-icon { opacity: 0; color: #ff4d4f; padding: 2px 6px; cursor: pointer; }
+        .del-icon { opacity: 0; color: #ff4d4f; padding: 2px 6px; cursor: pointer; font-style: normal; }
         .history-item:hover .del-icon { opacity: 1; }
         .main { flex: 1; display: flex; flex-direction: column; position: relative; }
         #scroller { flex: 1; overflow-y: auto; padding-bottom: 180px; }
@@ -67,6 +67,29 @@
     let controller = null;
     let selectedFile = null;
 
+    // --- 鉴权核心逻辑开始 ---
+    const getAuthHeaders = () => {
+        const getCookie = (name) => {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return localStorage.getItem('auth_hash') || ""; 
+        };
+        return {
+            'Content-Type': 'application/json',
+            'X-Password': getCookie('auth_hash')
+        };
+    };
+
+    const handleAuthError = (res) => {
+        if (res.status === 401) {
+            window.location.href = "/login.html";
+            return true;
+        }
+        return false;
+    };
+    // --- 鉴权核心逻辑结束 ---
+
     window.onload = () => { loadHistory(); startNew(); };
 
     function toggleTheme() {
@@ -84,7 +107,8 @@
     }
 
     async function loadHistory() {
-        const res = await fetch('/history');
+        const res = await fetch('/history', { headers: getAuthHeaders() });
+        if (handleAuthError(res)) return;
         const list = await res.json();
         document.getElementById('history-list').innerHTML = list.map(item => `
             <div class="history-item" onclick="loadChat('${item.chatId}')">
@@ -99,7 +123,14 @@
         currentId = chatId;
         const box = document.getElementById('msg-box');
         box.innerHTML = '<div style="padding:40px;text-align:center;opacity:0.5">加载中...</div>';
-        const res = await fetch('/history', { method:'POST', body: JSON.stringify({chatId}) });
+        
+        const res = await fetch('/history', { 
+            method: 'POST', 
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ chatId }) 
+        });
+        if (handleAuthError(res)) return;
+        
         const data = await res.json();
         messages = data.messages || [];
         box.innerHTML = '';
@@ -113,7 +144,12 @@
     async function deleteChat(e, chatId) {
         e.stopPropagation();
         if(!confirm("删除记录？")) return;
-        await fetch('/history', { method:'DELETE', body: JSON.stringify({chatId}) });
+        const res = await fetch('/history', { 
+            method: 'DELETE', 
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ chatId }) 
+        });
+        if (handleAuthError(res)) return;
         if(currentId === chatId) startNew();
         loadHistory();
     }
@@ -132,7 +168,13 @@
         if (selectedFile) {
             const fd = new FormData();
             fd.append('file', selectedFile);
-            const fRes = await fetch('/upload', { method:'POST', body: fd });
+            // 注意：upload 接口通常使用 FormData，Header 设置略有不同
+            const fRes = await fetch('/upload', { 
+                method:'POST', 
+                headers: { 'X-Password': getAuthHeaders()['X-Password'] }, // 仅传密码，让浏览器自动设 Boundary
+                body: fd 
+            });
+            if (handleAuthError(fRes)) return;
             const fData = await fRes.json();
             messages.push({ role: "user", content: `[文件: ${fData.name}]\n${fData.content}\n\n问题: ${text}` });
             displayTxt = `📄 _已关联: ${fData.name}_\n\n${text}`;
@@ -154,9 +196,13 @@
         try {
             const res = await fetch('/chat', {
                 method: 'POST',
+                headers: getAuthHeaders(),
                 body: JSON.stringify({ messages, chatId: currentId }),
                 signal: controller.signal
             });
+            
+            if (handleAuthError(res)) return;
+
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             while (true) {
