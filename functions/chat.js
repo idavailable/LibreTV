@@ -2,6 +2,8 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   const { messages, chatId } = await request.json();
 
+  if (!env.DEEPSEEK_API_KEY) return new Response("API Key Missing", { status: 500 });
+
   const response = await fetch("https://api.deepseek.com/chat/completions", {
     method: "POST",
     headers: {
@@ -19,9 +21,7 @@ export async function onRequestPost(context) {
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  const encoder = new TextEncoder();
 
-  // 创建新流，边转发边累积
   const stream = new ReadableStream({
     async start(controller) {
       let fullAI = "", fullReasoning = "", leftover = "";
@@ -30,30 +30,29 @@ export async function onRequestPost(context) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
-            // --- 关键：流结束即刻保存 ---
+            // 流结束后立即写入 R2
             if (env.MY_BUCKET && chatId) {
-              const firstMsg = messages.find(m => m.role === 'user')?.content || "新对话";
-              const shortTitle = firstMsg.trim().slice(0, 20).replace(/\n/g, " ");
-              
+              const title = messages.find(m => m.role === 'user')?.content.slice(0, 30).replace(/\n/g, " ") || "新对话";
               const historyData = {
                 chatId,
                 messages: [...messages, { role: "assistant", content: fullAI, reasoning_content: fullReasoning }]
               };
-
-              // 使用 customMetadata 存储标题，优化 history 接口
-              await env.MY_BUCKET.put(`history/${chatId}.json`, JSON.stringify(historyData), {
-                customMetadata: { title: shortTitle },
-                httpMetadata: { contentType: "application/json" }
-              });
+              // waitUntil 确保 Worker 不会在写入完成前关闭
+              context.waitUntil(
+                env.MY_BUCKET.put(`history/${chatId}.json`, JSON.stringify(historyData), {
+                  customMetadata: { title: title },
+                  httpMetadata: { contentType: "application/json" }
+                })
+              );
             }
             controller.close();
             break;
           }
 
-          // 转发原始字节
+          // 转发给前端
           controller.enqueue(value);
 
-          // 解析用于累加
+          // 累加内容用于保存（处理断裂的 JSON 碎片）
           const chunk = leftover + decoder.decode(value, { stream: true });
           const lines = chunk.split('\n');
           leftover = lines.pop() || "";
