@@ -1,24 +1,21 @@
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  // --- 安全检查：域名白名单 ---
+  // 1. 安全检查：只允许你的域名访问
   const host = request.headers.get("Host");
   const allowedHosts = ["mm.dhxlsfn.dpdns.org", "libretv-4gl.pages.dev"];
 
-  // 如果请求不是来自你的域名，直接拦截并返回 401
   if (!allowedHosts.includes(host)) {
-    return new Response("Unauthorized: Access denied for " + host, { 
-      status: 401,
-      headers: { "Content-Type": "text/plain" }
-    });
+    return new Response("Unauthorized", { status: 401 });
   }
-  // -------------------------
 
   try {
     const body = await request.json();
     const apiKey = env.DEEPSEEK_API_KEY; 
 
-    // 发起对 DeepSeek 官方 API 的请求
+    // 2. 动态识别模型：前端传什么用什么，没传默认用 R1 (reasoner)
+    const targetModel = body.model || "deepseek-reasoner";
+
     const response = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
@@ -26,29 +23,27 @@ export async function onRequestPost(context) {
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: body.model || "deepseek-chat",
+        model: targetModel,
         messages: body.messages,
-        stream: true // 保持流式输出
+        stream: true 
       })
     });
 
-    // 检查 DeepSeek API 是否返回错误（如余额不足或 Key 无效）
     if (!response.ok) {
       const errorText = await response.text();
-      return new Response(`DeepSeek API Error: ${errorText}`, { status: response.status });
+      return new Response(`DeepSeek Error: ${errorText}`, { status: response.status });
     }
 
-    // 将 DeepSeek 的流式响应直接转发给前端
+    // 3. 转发流式响应
     return new Response(response.body, {
       headers: { 
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
         "Access-Control-Allow-Origin": "*" 
       }
     });
 
   } catch (err) {
-    return new Response("Internal Server Error: " + err.message, { status: 500 });
+    return new Response("Server Error: " + err.message, { status: 500 });
   }
 }
