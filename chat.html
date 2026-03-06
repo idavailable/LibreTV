@@ -3,123 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LibreTV AI</title>
+    <title>LibreTV AI - 最终修复版</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hl-light">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css" id="hl-dark" disabled>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <style>
-        /* 1. 颜色与变量 - 默认亮色 */
         :root {
-            --bg: #ffffff; --side: #f9f9f9; --text: #1a1a1a; --border: #e0e0e0; --accent: #10a37f;
-            --msg-user: #f4f4f4; --input-bg: #ffffff;
+            --bg: #ffffff; --side: #f7f7f8; --text: #1a1a1a; --border: #e5e7eb; --accent: #10a37f;
+            --msg-user: #f3f4f6; --input-bg: #ffffff; --history-hover: #ececf1;
         }
         [data-theme="dark"] {
             --bg: #212121; --side: #171717; --text: #ececec; --border: #383838; --accent: #10a37f;
-            --msg-user: #2f2f2f; --input-bg: #2f2f2f;
+            --msg-user: #2f2f2f; --input-bg: #2f2f2f; --history-hover: #2a2a2a;
         }
 
         * { box-sizing: border-box; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; width: 100vw; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
 
-        /* 2. 侧边栏 - 确保功能都在 */
-        .sidebar { width: 260px; background: var(--side); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 15px; flex-shrink: 0; }
-        .side-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        /* --- 侧边栏 --- */
+        .sidebar { width: 260px; background: var(--side); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 15px; flex-shrink: 0; }
+        .side-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .logo { font-size: 18px; font-weight: 800; color: var(--accent); }
-        .theme-toggle { cursor: pointer; font-size: 18px; }
+        .theme-btn { cursor: pointer; font-size: 18px; opacity: 0.7; }
         
-        .btn-new-chat { border: 1px solid var(--border); padding: 10px; border-radius: 8px; cursor: pointer; text-align: center; margin-bottom: 20px; background: var(--bg); color: var(--text); font-weight: 600; transition: 0.2s; }
-        .btn-new-chat:hover { background: var(--msg-user); }
+        .new-btn { border: 1px solid var(--border); padding: 10px; border-radius: 8px; cursor: pointer; text-align: center; margin-bottom: 20px; background: var(--bg); font-weight: 600; color: var(--text); }
         
         #history-list { flex: 1; overflow-y: auto; }
-        .history-item { padding: 10px; border-radius: 6px; cursor: pointer; font-size: 13px; margin-bottom: 4px; border: 1px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .history-item:hover { background: var(--msg-user); }
+        .history-item { 
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-bottom: 5px; 
+            color: var(--text); position: relative; transition: 0.2s;
+        }
+        .history-item:hover { background: var(--history-hover); }
+        .history-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+        .del-icon { opacity: 0; color: #ff4d4f; font-size: 14px; padding: 2px 6px; transition: 0.2s; }
+        .history-item:hover .del-icon { opacity: 1; }
 
-        /* 3. 主界面布局 - 解决竖排文字的核心 */
-        .main-content { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; background: var(--bg); }
-        
-        #chat-scroller { flex: 1; overflow-y: auto; width: 100%; display: block; }
-        .msg-container { max-width: 800px; margin: 0 auto; width: 92%; padding-bottom: 150px; }
+        /* --- 主内容区 --- */
+        .main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; background: var(--bg); }
+        #scroller { flex: 1; overflow-y: auto; width: 100%; display: block; }
+        .msg-list { max-width: 850px; margin: 0 auto; width: 92%; padding-bottom: 160px; }
 
-        /* 消息行 - 强制不使用任何可能压缩宽度的 flex 属性 */
-        .msg-row { width: 100%; padding: 25px 0; border-bottom: 1px solid var(--border); display: block; clear: both; }
-        .msg-row.user-bg { background: var(--msg-user); width: 100vw; margin-left: calc(-50vw + 50%); } /* 用户背景铺满 */
-        
-        .avatar { width: 34px; height: 34px; border-radius: 4px; float: left; margin-right: 20px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #fff; }
+        /* 解决竖排字：隔离块布局 */
+        .msg-row { width: 100%; padding: 25px 0; border-bottom: 1px solid var(--border); display: block; clear: both; overflow: hidden; }
+        .avatar { width: 34px; height: 34px; border-radius: 4px; float: left; margin-right: 18px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #fff; }
         .ai-avatar { background: var(--accent); }
         .user-avatar { background: #5436DA; }
 
-        /* 核心修复：强制内容区横向撑开，绝不竖排 */
-        .msg-content { 
-            display: block; 
-            overflow: hidden; /* 关键：触发BFC，自动填充头像剩下的所有宽度 */
-            min-width: 200px; /* 保证最小宽度 */
-            line-height: 1.7; 
-            font-size: 16px; 
-            word-wrap: break-word; 
+        .content { 
+            display: block; overflow: hidden; /* 核心：触发BFC占满余下宽度 */
+            min-width: 200px; line-height: 1.7; font-size: 16px; word-wrap: break-word; 
         }
-        .msg-content p { margin: 0 0 1em 0; width: 100%; }
-        .msg-content pre { background: #000; color: #fff; padding: 15px; border-radius: 8px; overflow-x: auto; width: 100%; display: block; }
+        .content p { margin: 0 0 1em 0; width: 100%; }
+        .content pre { background: #000; color: #fff; padding: 15px; border-radius: 8px; overflow-x: auto; width: 100%; margin: 15px 0; border: 1px solid var(--border); }
+        
+        .reasoning { background: rgba(0,0,0,0.04); border-left: 4px solid var(--accent); padding: 15px; margin-bottom: 15px; border-radius: 4px; color: #666; font-size: 14px; width: 100%; }
+        [data-theme="dark"] .reasoning { background: rgba(255,255,255,0.05); color: #aaa; }
 
-        .reasoning-box { background: rgba(0,0,0,0.05); border-left: 4px solid var(--accent); padding: 15px; margin-bottom: 15px; border-radius: 4px; color: #666; font-size: 14px; width: 100%; }
-        [data-theme="dark"] .reasoning-box { background: rgba(255,255,255,0.05); color: #aaa; }
-
-        /* 4. 输入区域 - 恢复上传按钮 */
-        .input-sticky { position: absolute; bottom: 0; left: 0; right: 0; padding: 30px 0; background: linear-gradient(transparent, var(--bg) 50%); }
-        .input-box { max-width: 800px; margin: 0 auto; width: 92%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; position: relative; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        /* --- 输入区 --- */
+        .input-zone { position: absolute; bottom: 0; left: 0; right: 0; padding: 30px 0; background: linear-gradient(transparent, var(--bg) 60%); }
+        .input-bar { max-width: 850px; margin: 0 auto; width: 92%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 14px; padding: 12px; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
         textarea { width: 100%; border: none; outline: none; background: transparent; color: var(--text); font-size: 16px; resize: none; max-height: 200px; padding-bottom: 35px; }
         
-        .input-tools { position: absolute; bottom: 12px; right: 15px; display: flex; align-items: center; gap: 15px; }
-        .btn-upload { cursor: pointer; font-size: 20px; opacity: 0.6; }
-        .btn-upload:hover { opacity: 1; color: var(--accent); }
-        #btn-send { background: var(--accent); color: #fff; border: none; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        #file-indicator { display: none; font-size: 12px; color: var(--accent); margin-bottom: 5px; }
+        .tools { position: absolute; bottom: 12px; right: 15px; display: flex; align-items: center; gap: 15px; }
+        .up-btn { cursor: pointer; font-size: 20px; opacity: 0.6; }
+        #send-btn { background: var(--accent); color: #fff; border: none; padding: 6px 18px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        #file-tag { display: none; font-size: 12px; color: var(--accent); margin-bottom: 5px; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="sidebar">
-    <div class="side-header">
+    <div class="side-head">
         <div class="logo">LibreTV AI</div>
-        <div class="theme-toggle" onclick="toggleTheme()">🌓</div>
+        <div class="theme-btn" onclick="toggleTheme()">🌓</div>
     </div>
-    <div class="btn-new-chat" onclick="startNewChat()">+ 开启新对话</div>
+    <div class="new-btn" onclick="startNew()">+ 开启新对话</div>
     <div id="history-list"></div>
 </div>
 
-<div class="main-content">
-    <div id="chat-scroller">
-        <div class="msg-container" id="msg-box">
+<div class="main">
+    <div id="scroller">
+        <div class="msg-list" id="msg-box">
             <div class="msg-row">
                 <div class="avatar ai-avatar">R</div>
-                <div class="msg-content">所有功能已整合。默认明亮模式，支持上传和完整历史加载。如果文字依然竖向，请尝试清理浏览器缓存。</div>
+                <div class="content">布局已锁定。点击侧边栏对话旁的 🗑️ 可删除历史。</div>
             </div>
         </div>
     </div>
 
-    <div class="input-sticky">
-        <div class="input-box">
-            <div id="file-indicator"></div>
-            <textarea id="userInput" placeholder="输入消息..." rows="1"></textarea>
-            <div class="input-tools">
-                <label class="btn-upload" title="上传附件">
-                    📎 <input type="file" id="fileInput" hidden onchange="onFileSelect(this)">
-                </label>
-                <button id="btn-send" onclick="handleAction()">发送</button>
+    <div class="input-zone">
+        <div class="input-bar">
+            <div id="file-tag"></div>
+            <textarea id="userInput" placeholder="问我任何问题..." rows="1"></textarea>
+            <div class="tools">
+                <label class="up-btn">📎<input type="file" id="fileInput" hidden onchange="onFile(this)"></label>
+                <button id="send-btn" onclick="doAction()">发送</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    let currentChatId = "chat_" + Date.now();
+    let currentId = "chat_" + Date.now();
     let messages = [];
     let controller = null;
     let selectedFile = null;
 
     window.onload = loadHistory;
 
-    // --- 主题切换 ---
     function toggleTheme() {
         const b = document.body;
         const isDark = b.hasAttribute('data-theme');
@@ -134,35 +127,42 @@
         }
     }
 
-    // --- 文件处理 ---
-    function onFileSelect(input) {
+    function onFile(input) {
         if(input.files[0]) {
             selectedFile = input.files[0];
-            const indicator = document.getElementById('file-indicator');
-            indicator.innerText = "已选择: " + selectedFile.name;
-            indicator.style.display = "block";
+            const tag = document.getElementById('file-tag');
+            tag.innerText = "📁 待发送: " + selectedFile.name;
+            tag.style.display = "block";
         }
     }
 
-    // --- 历史记录完整加载 ---
+    // --- 历史记录：加载列表 ---
     async function loadHistory() {
         try {
             const res = await fetch('/history');
             const list = await res.json();
             document.getElementById('history-list').innerHTML = list.map(item => `
-                <div class="history-item" onclick="loadChat('${item.chatId}')">💬 ${item.title || '历史会话'}</div>
+                <div class="history-item" onclick="loadChat('${item.chatId}')">
+                    <span>💬 ${item.title || '新对话'}</span>
+                    <i class="del-icon" onclick="deleteChat(event, '${item.chatId}')">🗑️</i>
+                </div>
             `).join('');
         } catch (e) {}
     }
 
+    // --- 历史记录：完整载入（核心修复） ---
     async function loadChat(chatId) {
-        currentChatId = chatId;
+        currentId = chatId;
         const box = document.getElementById('msg-box');
-        box.innerHTML = '<div style="padding:20px;opacity:0.5">加载完整记录中...</div>';
+        box.innerHTML = '<div style="padding:40px;text-align:center;opacity:0.5">正在同步完整历史...</div>';
         try {
-            const res = await fetch('/history', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ chatId }) });
+            const res = await fetch('/history', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ chatId }) 
+            });
             const data = await res.json();
-            messages = data.messages || [];
+            messages = data.messages || []; // 完整载入历史消息数组
             box.innerHTML = '';
             messages.forEach(msg => {
                 if(msg.role === 'assistant' && msg.reasoning_content) {
@@ -170,16 +170,33 @@
                 }
                 appendRow(msg.role, msg.content);
             });
-        } catch (e) { box.innerHTML = "加载失败"; }
+            document.getElementById('scroller').scrollTop = document.getElementById('scroller').scrollHeight;
+        } catch (e) { box.innerHTML = "历史载入失败"; }
     }
 
-    // --- 对话逻辑 ---
-    function handleAction() {
-        if (document.getElementById('btn-send').innerText === '发送') sendMessage();
+    // --- 历史记录：删除功能 ---
+    async function deleteChat(event, chatId) {
+        event.stopPropagation(); // 阻止触发 loadChat
+        if(!confirm("确定要删除这条对话吗？")) return;
+        try {
+            const res = await fetch('/history', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ chatId })
+            });
+            if(res.ok) {
+                if(currentId === chatId) startNew();
+                loadHistory();
+            }
+        } catch(e) { alert("删除操作失败"); }
+    }
+
+    function doAction() {
+        if (document.getElementById('send-btn').innerText === '发送') send();
         else if (controller) controller.abort();
     }
 
-    async function sendMessage() {
+    async function send() {
         const input = document.getElementById('userInput');
         const text = input.value.trim();
         if (!text && !selectedFile) return;
@@ -190,36 +207,36 @@
         if (selectedFile) {
             const fd = new FormData();
             fd.append('file', selectedFile);
-            fd.append('chatId', currentChatId);
+            fd.append('chatId', currentId);
             try {
                 const res = await fetch('/upload', { method: 'POST', body: fd });
                 const fData = await res.json();
                 if (fData.isText) {
-                    aiPrompt = `[文件:${fData.name}]\n${fData.content}\n\n问题:${text}`;
-                    displayTxt += `\n\n📄 _已读取附件: ${fData.name}_`;
+                    aiPrompt = `[文件内容:${fData.name}]\n${fData.content}\n\n问题:${text}`;
+                    displayTxt += `\n\n📄 _已分析文件: ${fData.name}_`;
                 }
             } catch(e) {}
             selectedFile = null;
-            document.getElementById('file-indicator').style.display = 'none';
+            document.getElementById('file-tag').style.display = 'none';
         }
 
         input.value = '';
         input.style.height = 'auto';
-        document.getElementById('btn-send').innerText = '停止';
+        document.getElementById('send-btn').innerText = '停止';
 
         appendRow('user', displayTxt);
         messages.push({ role: "user", content: aiPrompt });
 
         controller = new AbortController();
         const aiRow = createAiRow();
-        const aiDiv = aiRow.querySelector('.msg-content');
+        const aiDiv = aiRow.querySelector('.content');
         let fullText = "", reasoningText = "", reasoningDiv = null;
 
         try {
             const response = await fetch('/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messages, chatId: currentChatId }),
+                body: JSON.stringify({ messages, chatId: currentId }),
                 signal: controller.signal
             });
 
@@ -240,19 +257,19 @@
                             if (delta.reasoning_content) {
                                 if (!reasoningDiv) {
                                     reasoningDiv = document.createElement('div');
-                                    reasoningDiv.className = 'reasoning-box';
-                                    reasoningDiv.innerHTML = `<b>🤔 思考过程:</b><div class="r-text"></div>`;
+                                    reasoningDiv.className = 'reasoning';
+                                    reasoningDiv.innerHTML = `<b>🤔 思考中...</b><div class="r-txt"></div>`;
                                     aiDiv.parentNode.insertBefore(reasoningDiv, aiDiv);
                                 }
                                 reasoningText += delta.reasoning_content;
-                                reasoningDiv.querySelector('.r-text').innerText = reasoningText;
+                                reasoningDiv.querySelector('.r-txt').innerText = reasoningText;
                             }
                             if (delta.content) {
                                 fullText += delta.content;
                                 aiDiv.innerHTML = marked.parse(fullText);
                                 aiDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
                             }
-                            document.getElementById('chat-scroller').scrollTop = document.getElementById('chat-scroller').scrollHeight;
+                            document.getElementById('scroller').scrollTop = document.getElementById('scroller').scrollHeight;
                         } catch (e) {}
                     }
                 }
@@ -260,37 +277,37 @@
             messages.push({ role: "assistant", content: fullText, reasoning_content: reasoningText });
             loadHistory();
         } catch (e) {
-            if (e.name === 'AbortError') aiDiv.innerHTML += " [已中途停止]";
+            if (e.name === 'AbortError') aiDiv.innerHTML += " [停止]";
         } finally {
-            document.getElementById('btn-send').innerText = '发送';
+            document.getElementById('send-btn').innerText = '发送';
             controller = null;
         }
     }
 
     function appendRow(role, text) {
         const row = document.createElement('div');
-        row.className = `msg-row ${role==='user'?'user-bg':''}`;
-        row.innerHTML = `<div class="msg-inner-wrap" style="max-width:800px; margin:0 auto;"><div class="avatar ${role==='user'?'user-avatar':'ai-avatar'}">${role==='user'?'U':'R'}</div><div class="msg-content">${marked.parse(text)}</div></div>`;
+        row.className = 'msg-row';
+        row.innerHTML = `<div class="avatar ${role==='user'?'user-avatar':'ai-avatar'}">${role==='user'?'U':'R'}</div><div class="content">${marked.parse(text)}</div>`;
         document.getElementById('msg-box').appendChild(row);
-        document.getElementById('chat-scroller').scrollTop = document.getElementById('chat-scroller').scrollHeight;
+        document.getElementById('scroller').scrollTop = document.getElementById('scroller').scrollHeight;
     }
 
     function createAiRow() {
         const row = document.createElement('div');
         row.className = 'msg-row';
-        row.innerHTML = `<div class="msg-inner-wrap" style="max-width:800px; margin:0 auto;"><div class="avatar ai-avatar">R</div><div class="msg-content">...</div></div>`;
+        row.innerHTML = `<div class="avatar ai-avatar">R</div><div class="content">...</div>`;
         document.getElementById('msg-box').appendChild(row);
         return row;
     }
 
     function appendReasoning(text) {
-        const box = document.createElement('div');
-        box.className = 'msg-row';
-        box.innerHTML = `<div style="max-width:800px; margin:0 auto;"><div class="reasoning-box"><b>🤔 历史思考:</b><div>${text}</div></div></div>`;
-        document.getElementById('msg-box').appendChild(box);
+        const div = document.createElement('div');
+        div.className = 'msg-row';
+        div.innerHTML = `<div class="reasoning"><b>🤔 思考过程:</b><div>${text}</div></div>`;
+        document.getElementById('msg-box').appendChild(div);
     }
 
-    function startNewChat() { location.reload(); }
+    function startNew() { location.reload(); }
 
     document.getElementById('userInput').oninput = function() {
         this.style.height = 'auto';
