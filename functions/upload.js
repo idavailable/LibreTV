@@ -1,21 +1,16 @@
 export async function onRequestPost(context) {
-  const { request } = context;
   try {
-    const formData = await request.formData();
+    const formData = await context.request.formData();
     const file = formData.get('file');
-    
-    if (!file) return new Response("No file", { status: 400 });
+    if (!file) return new Response("Missing file", { status: 400 });
 
-    const content = await file.text();
-    // 简单清洗一下文本，防止干扰 AI
-    const safeContent = content.slice(0, 10000); // 限制 1w 字，防止上下文溢出
-
+    const text = await file.text();
     return new Response(JSON.stringify({
       name: file.name,
-      content: safeContent,
+      content: text.slice(0, 15000), // 限制字符数防止模型溢出
       isText: true
-    }), { headers: { "Content-Type": "application/json" } });
-  } catch (err) {
-    return new Response(err.message, { status: 500 });
+    }));
+  } catch (e) {
+    return new Response(e.message, { status: 500 });
   }
 }
