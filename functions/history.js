@@ -4,6 +4,7 @@ export async function onRequest(context) {
 
   try {
     if (method === "GET") {
+      // 仅读取元数据，不读取文件内容
       const objects = await env.MY_BUCKET.list({ prefix: "history/", include: ['customMetadata'] });
       const list = objects.objects.map(obj => ({
         chatId: obj.key.replace("history/", "").replace(".json", ""),
