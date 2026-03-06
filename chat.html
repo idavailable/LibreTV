@@ -135,7 +135,6 @@
         }
     }
 
-    // --- 历史记录：加载列表 ---
     async function loadHistory() {
         try {
             const res = await fetch('/history');
@@ -149,8 +148,8 @@
         } catch (e) {}
     }
 
-    // --- 历史记录：完整载入 (关键修复) ---
     async function loadChat(chatId) {
+        if (controller) controller.abort();
         currentId = chatId;
         const box = document.getElementById('msg-box');
         box.innerHTML = '<div style="padding:40px;text-align:center;opacity:0.5">正在提取云端完整记录...</div>';
@@ -162,12 +161,10 @@
             });
             const data = await res.json();
             
-            // 核心修复：清空旧对话并重新载入
             messages = data.messages || []; 
             box.innerHTML = '';
             
             messages.forEach(msg => {
-                // 如果是 AI 且包含思考过程，先渲染思考框
                 if(msg.role === 'assistant' && msg.reasoning_content) {
                     appendReasoning(msg.reasoning_content);
                 }
@@ -177,7 +174,6 @@
         } catch (e) { box.innerHTML = "历史载入失败"; }
     }
 
-    // --- 历史记录：物理删除 ---
     async function deleteChat(event, chatId) {
         event.stopPropagation(); 
         if(!confirm("确定要永久删除这条对话吗？")) return;
@@ -210,15 +206,14 @@
         if (selectedFile) {
             const fd = new FormData();
             fd.append('file', selectedFile);
-            fd.append('chatId', currentId);
             try {
                 const res = await fetch('/upload', { method: 'POST', body: fd });
                 const fData = await res.json();
                 if (fData.isText) {
-                    aiPrompt = `[文件:${fData.name}]\n${fData.content}\n\n问题:${text}`;
-                    displayTxt += `\n\n📄 _文件已读: ${fData.name}_`;
+                    aiPrompt = `[文件内容: ${fData.name}]\n${fData.content}\n\n问题: ${text}`;
+                    displayTxt = `📄 _已关联文件: ${fData.name}_\n\n${text}`;
                 }
-            } catch(e) {}
+            } catch(e) { console.error("文件上传失败"); }
             selectedFile = null;
             document.getElementById('file-tag').style.display = 'none';
         }
@@ -250,12 +245,15 @@
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                const lines = decoder.decode(value).split('\n');
+                
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
                 for (const line of lines) {
                     if (line.startsWith('data: ') && line !== 'data: [DONE]') {
                         try {
                             const data = JSON.parse(line.substring(6));
                             const delta = data.choices[0].delta;
+                            
                             if (delta.reasoning_content) {
                                 if (!reasoningDiv) {
                                     reasoningDiv = document.createElement('div');
@@ -266,15 +264,16 @@
                                 reasoningText += delta.reasoning_content;
                                 reasoningDiv.querySelector('.r-txt').innerText = reasoningText;
                             }
+                            
                             if (delta.content) {
                                 fullText += delta.content;
                                 aiDiv.innerHTML = marked.parse(fullText);
                                 aiDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
                             }
-                            document.getElementById('scroller').scrollTop = document.getElementById('scroller').scrollHeight;
                         } catch (e) {}
                     }
                 }
+                document.getElementById('scroller').scrollTop = document.getElementById('scroller').scrollHeight;
             }
             messages.push({ role: "assistant", content: fullText, reasoning_content: reasoningText });
             loadHistory();
@@ -305,7 +304,7 @@
     function appendReasoning(text) {
         const div = document.createElement('div');
         div.className = 'msg-row';
-        div.innerHTML = `<div class="reasoning"><b>🤔 历史思考:</b><div>${text}</div></div>`;
+        div.innerHTML = `<div class="reasoning"><b>🤔 历史思考:</b><div class="r-txt">${text}</div></div>`;
         document.getElementById('msg-box').appendChild(div);
     }
 
