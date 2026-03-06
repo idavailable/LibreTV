@@ -32,14 +32,19 @@ function showToast(message, type = 'error') {
     let toast = document.getElementById('toast');
     let toastMessage = document.getElementById('toastMessage');
 
-    // 如果toast元素不存在，创建它
+    // 如果toast元素不存在，创建它（采用右下角滑入，黑金权力粉风格）
     if (!toast) {
         toast = document.createElement('div');
         toast.id = 'toast';
-        toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 z-50 opacity-0';
-        toast.style = 'z-index: 2147483647'
+        // 样式升级：右下角，半透明黑，权力粉左边框
+        toast.className = 'fixed bottom-8 right-8 px-6 py-3 rounded-sm shadow-2xl transform transition-all duration-500 z-[9999] opacity-0 translate-x-12';
+        toast.style.backgroundColor = 'rgba(10, 10, 10, 0.9)';
+        toast.style.backdropFilter = 'blur(10px)';
+        toast.style.borderLeft = '4px solid #ff2d55';
+        
         toastMessage = document.createElement('p');
         toastMessage.id = 'toastMessage';
+        toastMessage.className = 'text-sm tracking-wide text-gray-200';
         toast.appendChild(toastMessage);
 
         document.body.appendChild(toast);
@@ -53,7 +58,6 @@ function showToast(message, type = 'error') {
         showNextToast();
     }
 }
-
 function showNextToast() {
     if (toastQueue.length === 0) {
         isShowingToast = false;
@@ -62,34 +66,31 @@ function showNextToast() {
 
     isShowingToast = true;
     const { message, type } = toastQueue.shift();
-
     const toast = document.getElementById('toast');
     const toastMessage = document.getElementById('toastMessage');
 
-    const bgColors = {
-        'error': 'bg-red-500',
-        'success': 'bg-green-500',
-        'info': 'bg-blue-500',
-        'warning': 'bg-yellow-500'
+    const typeColors = {
+        'error': '#ef4444',
+        'success': '#ff2d55', // 权力粉
+        'info': '#3b82f6',
+        'warning': '#f59e0b'
     };
 
-    const bgColor = bgColors[type] || bgColors.error;
-    toast.className = `fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 ${bgColor} text-white z-50`;
+    toast.style.borderLeftColor = typeColors[type] || typeColors.error;
     toastMessage.textContent = message;
 
-    // 显示提示
+    // 显示提示：从右侧平滑滑入
     toast.style.opacity = '1';
-    toast.style.transform = 'translateX(-50%) translateY(0)';
+    toast.style.transform = 'translateX(0) translateY(0)';
 
     // 3秒后自动隐藏
     setTimeout(() => {
         toast.style.opacity = '0';
-        toast.style.transform = 'translateX(-50%) translateY(-100%)';
+        toast.style.transform = 'translateX(20px)'; // 向右消失
 
-        // 等待动画完成后显示下一个toast
         setTimeout(() => {
             showNextToast();
-        }, 300);
+        }, 400);
     }, 3000);
 }
 
@@ -382,89 +383,36 @@ function getViewingHistory() {
 function loadViewingHistory() {
     const historyList = document.getElementById('historyList');
     if (!historyList) return;
-
     const history = getViewingHistory();
-
     if (history.length === 0) {
-        historyList.innerHTML = `<div class="text-center text-gray-500 py-8">暂无观看记录</div>`;
+        historyList.innerHTML = `<div class="text-center text-gray-600 py-12 text-sm tracking-widest">NO RECORDS / 暂无记录</div>`;
         return;
     }
-
-    // 渲染历史记录
     historyList.innerHTML = history.map(item => {
-        // 防止XSS
-        const safeTitle = item.title
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-
-        const safeSource = item.sourceName ?
-            item.sourceName.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') :
-            '未知来源';
-
-        const episodeText = item.episodeIndex !== undefined ?
-            `第${item.episodeIndex + 1}集` : '';
-
-        // 格式化剧集信息
-        let episodeInfoHtml = '';
-        if (item.episodes && Array.isArray(item.episodes) && item.episodes.length > 0) {
-            const totalEpisodes = item.episodes.length;
-            const syncStatus = item.lastSyncTime ?
-                `<span class="text-green-400 text-xs" title="剧集列表已同步">✓</span>` :
-                `<span class="text-yellow-400 text-xs" title="使用缓存数据">⚠</span>`;
-            episodeInfoHtml = `<span class="text-xs text-gray-400">共${totalEpisodes}集 ${syncStatus}</span>`;
-        }
-
-        // 格式化进度信息
-        let progressHtml = '';
-        if (item.playbackPosition && item.duration && item.playbackPosition > 10 && item.playbackPosition < item.duration * 0.95) {
-            const percent = Math.round((item.playbackPosition / item.duration) * 100);
-            const formattedTime = formatPlaybackTime(item.playbackPosition);
-            const formattedDuration = formatPlaybackTime(item.duration);
-
-            progressHtml = `
-                <div class="history-progress">
-                    <div class="progress-bar">
-                        <div class="progress-filled" style="width:${percent}%"></div>
-                    </div>
-                    <div class="progress-text">${formattedTime} / ${formattedDuration}</div>
-                </div>
-            `;
-        }
-
-        // 为防止XSS，使用encodeURIComponent编码URL
-        const safeURL = encodeURIComponent(item.url);
-
-        // 构建历史记录项HTML，添加删除按钮，需要放在position:relative的容器中
+        const safeTitle = item.title.replace(/"/g, '&quot;');
+        const percent = (item.playbackPosition && item.duration) ? Math.round((item.playbackPosition / item.duration) * 100) : 0;
         return `
-            <div class="history-item cursor-pointer relative group" onclick="playFromHistory('${item.url}', '${safeTitle}', ${item.episodeIndex || 0}, ${item.playbackPosition || 0})">
-                <button onclick="event.stopPropagation(); deleteHistoryItem('${safeURL}')"
-                        class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-gray-400 hover:text-red-400 p-1 rounded-full hover:bg-gray-800 z-10"
-                        title="删除记录">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
+            <div class="history-item relative group mb-2 p-4 bg-[#0a0a0a] border-l-2 border-transparent hover:border-[#ff2d55] transition-all cursor-pointer" 
+                 onclick="playFromHistory('${item.url}', '${safeTitle}', ${item.episodeIndex || 0}, ${item.playbackPosition || 0})">
+                <button onclick="event.stopPropagation(); deleteHistoryItem('${encodeURIComponent(item.url)}')"
+                        class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-500 z-20">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="2"></path></svg>
                 </button>
-                <div class="history-info">
-                    <div class="history-title">${safeTitle}</div>
-                    <div class="history-meta">
-                        <span class="history-episode">${episodeText}</span>
-                        ${episodeText ? '<span class="history-separator mx-1">·</span>' : ''}
-                        <span class="history-source">${safeSource}</span>
-                        ${episodeInfoHtml ? '<span class="history-separator mx-1">·</span>' : ''}
-                        ${episodeInfoHtml}
+                <div class="relative z-10 text-left">
+                    <div class="text-gray-200 font-medium truncate pr-6">${safeTitle}</div>
+                    <div class="flex items-center gap-2 mt-1 text-[10px] text-gray-500 uppercase tracking-tighter">
+                        <span>第${(item.episodeIndex || 0) + 1}集</span>
+                        <span>·</span>
+                        <span class="ml-auto">${formatTimestamp(item.timestamp)}</span>
                     </div>
-                    ${progressHtml}
-                    <div class="history-time">${formatTimestamp(item.timestamp)}</div>
+                    ${percent > 0 ? `
+                    <div class="mt-3 h-[2px] w-full bg-[#1a1a1a] overflow-hidden">
+                        <div class="h-full bg-[#ff2d55]" style="width: ${percent}%"></div>
+                    </div>` : ''}
                 </div>
             </div>
         `;
     }).join('');
-
-    // 检查是否存在较多历史记录，添加底部边距确保底部按钮不会挡住内容
-    if (history.length > 5) {
-        historyList.classList.add('pb-4');
-    }
 }
 
 // 格式化播放时间为 mm:ss 格式
@@ -809,92 +757,54 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 清除本地存储缓存并刷新页面
 function clearLocalStorage() {
-    // 确保模态框在页面上只有一个实例
     let modal = document.getElementById('messageBoxModal');
-    if (modal) {
-        document.body.removeChild(modal);
-    }
+    if (modal) modal.remove();
 
-    // 创建模态框元素
     modal = document.createElement('div');
     modal.id = 'messageBoxModal';
-    modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-40';
-
+    modal.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-[10000] backdrop-blur-sm';
+    
+    // 初始确认界面
     modal.innerHTML = `
-        <div class="bg-[#191919] rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto relative">
-            <button id="closeBoxModal" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl">&times;</button>
-
-            <h3 class="text-xl font-bold text-red-500 mb-4">警告</h3>
-
-            <div class="mb-0">
-                <div class="text-sm font-medium text-gray-300">确定要清除页面缓存吗？</div>
-                <div class="text-sm font-medium text-gray-300 mb-4">此功能会删除你的观看记录、自定义 API 接口和 Cookie，<scan class="text-red-500 font-bold">此操作不可恢复！</scan></div>
-                <div class="flex justify-end space-x-2">
-                    <button id="confirmBoxModal" class="ml-2 bg-gray-600 hover:bg-gray-700 text-white px-4 py-1 rounded">确定</button>
-                    <button id="cancelBoxModal" class="ml-2 bg-pink-600 hover:bg-pink-700 text-white px-4 py-1 rounded">取消</button>
-                </div>
+        <div class="bg-[#0a0a0a] border border-[#222] p-8 max-w-sm w-full shadow-2xl relative">
+            <h3 class="text-red-500 font-bold tracking-tighter text-xl mb-4 uppercase">System Reset</h3>
+            <p class="text-gray-400 text-sm mb-8 leading-relaxed">
+                此操作将永久抹除所有观看档案、授权协议及 Cookie。这是一种不可逆的支配行为。
+            </p>
+            <div class="flex gap-4">
+                <button onclick="executeFinalClear(this)" class="flex-1 py-2 border border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition-all text-xs font-bold">确定执行</button>
+                <button onclick="this.closest('#messageBoxModal').remove()" class="flex-1 py-2 bg-[#222] text-gray-400 hover:text-white text-xs">取消</button>
             </div>
         </div>`;
-
-    // 添加模态框到页面
     document.body.appendChild(modal);
-
-    // 添加事件监听器 - 关闭按钮
-    document.getElementById('closeBoxModal').addEventListener('click', function () {
-        document.body.removeChild(modal);
-    });
-
-    // 添加事件监听器 - 确定按钮
-    document.getElementById('confirmBoxModal').addEventListener('click', function () {
-        // 清除所有localStorage数据
-        localStorage.clear();
-
-        // 清除所有cookie
-        const cookies = document.cookie.split(";");
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i];
-            const eqPos = cookie.indexOf("=");
-            const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
-        }
-
-        modal.innerHTML = `
-            <div class="bg-[#191919] rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto relative">
-                <button id="closeBoxModal" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl">&times;</button>
-
-                <h3 class="text-xl font-bold text-white mb-4">提示</h3>
-
-                <div class="mb-4">
-                    <div class="text-sm font-medium text-gray-300 mb-4">页面缓存和Cookie已清除，<span id="countdown">3</span> 秒后自动刷新本页面。</div>
-                </div>
-            </div>`;
-
-        let countdown = 3;
-        const countdownElement = document.getElementById('countdown');
-
-        const countdownInterval = setInterval(() => {
-            countdown--;
-            if (countdown >= 0) {
-                countdownElement.textContent = countdown;
-            } else {
-                clearInterval(countdownInterval);
-                window.location.reload();
-            }
-        }, 1000);
-    });
-
-    // 添加事件监听器 - 取消按钮
-    document.getElementById('cancelBoxModal').addEventListener('click', function () {
-        document.body.removeChild(modal);
-    });
-
-    // 添加事件监听器 - 点击模态框外部关闭
-    modal.addEventListener('click', function (e) {
-        if (e.target === modal) {
-            document.body.removeChild(modal);
-        }
-    });
 }
+
+// 将复杂的清理和倒计时抽离出来，保持主函数简洁
+window.executeFinalClear = function(btn) {
+    // 1. 执行清理
+    localStorage.clear();
+    document.cookie.split(";").forEach(c => {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+
+    // 2. 变换界面
+    const container = btn.closest('div').parentElement;
+    container.innerHTML = `
+        <h3 class="text-white font-bold text-xl mb-4">RESETTING...</h3>
+        <p class="text-gray-400 text-sm mb-4">痕迹已清除。系统将在 <span id="countdown" class="text-[#ff2d55] font-bold">3</span> 秒后重启。</p>
+    `;
+
+    // 3. 倒计时刷新
+    let count = 3;
+    const timer = setInterval(() => {
+        if (--count <= 0) {
+            clearInterval(timer);
+            location.reload();
+        } else {
+            document.getElementById('countdown').textContent = count;
+        }
+    }, 1000);
+};
 
 // 显示配置文件导入页面
 function showImportBox(fun) {
