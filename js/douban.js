@@ -502,6 +502,7 @@ async function fetchDoubanData(url) {
 // 抽取渲染豆瓣卡片的逻辑到单独函数
 // 抽取渲染豆瓣卡片的逻辑到单独函数
 // 重新对齐并使用稳定代理的渲染函数
+// 终极修复：使用百度及 WordPress 混合代理策略
 function renderDoubanCards(data, container) {
     const fragment = document.createDocumentFragment();
     
@@ -518,16 +519,20 @@ function renderDoubanCards(data, container) {
             const safeTitle = item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
             const safeRate = (item.rate || "暂无").replace(/</g, '&lt;').replace(/>/g, '&gt;');
             
-            // 核心修复：使用更稳健的 WordPress 代理，并强制清理 URL
+            // 核心逻辑：使用百度图片中转代理（目前绕过豆瓣最稳的方法）
             let originalCoverUrl = item.cover ? item.cover.trim() : "";
             const cleanUrl = originalCoverUrl.replace(/^https?:\/\//, '');
-            const finalImgUrl = `https://i0.wp.com/${cleanUrl}`;
+            
+            // 百度搜索的图片缩略图中转接口
+            const baiduProxy = `https://image.baidu.com/search/down?url=${encodeURIComponent(originalCoverUrl)}`;
+            // 备用：WordPress 代理
+            const wpProxy = `https://i0.wp.com/${cleanUrl}`;
 
             card.innerHTML = `
                 <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
-                    <img src="${finalImgUrl}" alt="${safeTitle}" 
+                    <img src="${baiduProxy}" alt="${safeTitle}" 
                         class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-                        onerror="this.onerror=null; this.src='image/logo.png';" 
+                        onerror="if(!this.getAttribute('data-retry')){this.setAttribute('data-retry', '1'); this.src='${wpProxy}';}else{this.src='image/logo.png';}" 
                         loading="lazy">
                     <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
                     <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
