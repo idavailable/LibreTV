@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>身份验证 - LibreTV</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #1a1a1a; color: #ececec; }
+        .login-card { background: #2f2f2f; border: 1px solid #383838; }
+    </style>
+</head>
+<body class="flex items-center justify-center h-screen">
+    <div class="login-card p-8 rounded-xl shadow-2xl w-full max-w-md text-center">
+        <h1 class="text-2xl font-bold mb-6 text-emerald-500">LibreTV 安全访问</h1>
+        <p class="mb-6 text-gray-400">请输入访问密码以继续</p>
+        
+        <input type="password" id="passwordInput" 
+               class="w-full p-3 rounded bg-gray-800 border border-gray-700 mb-4 focus:outline-none focus:border-emerald-500" 
+               placeholder="访问密码">
+        
+        <button onclick="handleLogin()" 
+                class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded transition-colors">
+            验证并进入
+        </button>
+        
+        <p id="errorMsg" class="mt-4 text-red-500 hidden">密码错误，请重试</p>
+    </div>
+
+    <script type="module">
+        import { sha256 } from './js/sha256.js';
+
+        window.handleLogin = async () => {
+            const pwd = document.getElementById('passwordInput').value;
+            const errorMsg = document.getElementById('errorMsg');
+            
+            if (!pwd) return;
+
+            // 计算哈希值
+            const hash = await sha256(pwd);
+            
+            // 写入通行证 (Cookie) - 7天有效
+            document.cookie = `auth_hash=${hash}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+            
+            // 存入本地存储备用
+            localStorage.setItem('auth_hash', hash);
+
+            // 尝试返回之前的页面或首页
+            window.location.href = "/index.html";
+        };
+
+        // 回车触发
+        document.getElementById('passwordInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleLogin();
+        });
+    </script>
+</body>
+</html>
