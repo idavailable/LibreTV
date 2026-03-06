@@ -8,67 +8,52 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <style>
-        /* 1. 基础样式 */
+        /* 基础设置：强制不使用任何 flex 居中 */
         :root { --bg: #212121; --side: #171717; --text: #ececec; --border: #383838; --accent: #10a37f; }
         * { box-sizing: border-box; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; width: 100vw; overflow: hidden; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; }
 
-        /* 2. 侧边栏恢复 */
-        .sidebar { width: 260px; background: var(--side); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 15px; flex-shrink: 0; }
-        .logo { font-size: 22px; font-weight: 800; color: var(--accent); margin-bottom: 25px; display: flex; align-items: center; gap: 10px; }
-        .new-chat-btn { border: 1px solid var(--accent); padding: 12px; border-radius: 8px; cursor: pointer; background: rgba(16, 163, 127, 0.1); color: var(--accent); font-weight: bold; text-align: center; margin-bottom: 20px; transition: 0.3s; }
-        .new-chat-btn:hover { background: rgba(16, 163, 127, 0.2); }
-        #history-container { flex: 1; overflow-y: auto; }
-        .history-item { padding: 10px; border-radius: 6px; cursor: pointer; margin-bottom: 5px; font-size: 13px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid transparent; }
+        /* 侧边栏：使用固定定位 */
+        .sidebar { width: 260px; position: fixed; left: 0; top: 0; bottom: 0; background: var(--side); border-right: 1px solid var(--border); padding: 20px; z-index: 100; overflow-y: auto; }
+        .logo { font-size: 22px; font-weight: bold; color: var(--accent); margin-bottom: 20px; }
+        .new-chat-btn { display: block; width: 100%; border: 1px solid var(--accent); padding: 12px; border-radius: 8px; cursor: pointer; background: rgba(16, 163, 127, 0.1); color: var(--accent); text-align: center; margin-bottom: 20px; text-decoration: none; }
+        .history-item { display: block; padding: 10px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #aaa; margin-bottom: 5px; border: 1px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .history-item:hover { background: #2a2a2a; color: #fff; }
 
-        /* 3. 主界面布局 - 彻底放弃 Flex 居中以解决竖排问题 */
-        .main-container { flex: 1; position: relative; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+        /* 主界面：使用 margin 给侧边栏留位置 */
+        .main-container { margin-left: 260px; min-height: 100vh; position: relative; width: calc(100% - 260px); }
         
-        /* 聊天窗口：直接块级滚动 */
-        #chat-window { flex: 1; overflow-y: auto; width: 100%; display: block; padding-bottom: 100px; }
+        /* 聊天窗口：彻底的块级流 */
+        #chat-window { width: 100%; padding-bottom: 150px; display: block; }
+        .message-row { width: 100%; border-bottom: 1px solid var(--border); padding: 30px 20px; display: block; clear: both; }
+        .message-inner { max-width: 800px; margin: 0 auto; display: block; }
         
-        /* 消息行：强制宽度 100% */
-        .message-row { width: 100%; border-bottom: 1px solid var(--border); padding: 30px 0; }
-        .message-inner { max-width: 850px; margin: 0 auto; width: 92%; display: flex; align-items: flex-start; gap: 20px; }
-        
-        .avatar { width: 34px; height: 34px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; }
+        /* 头像与内容：使用浮动或简单块级，防止挤压 */
+        .avatar { width: 34px; height: 34px; border-radius: 6px; float: left; margin-right: 20px; text-align: center; line-height: 34px; font-weight: bold; color: white; }
         .ai-avatar { background: var(--accent); }
         .user-avatar { background: #5436DA; }
 
-        /* 4. 内容区核心修复：严禁宽度塌陷 */
-        .content { 
-            flex: 1; 
-            min-width: 0; /* 允许在 Flex 容器内正确撑开 */
-            display: block; 
-            width: 100%; 
-            font-size: 16px; 
-            line-height: 1.7; 
-            word-wrap: break-word; 
-            overflow-wrap: break-word; 
-        }
-        /* 强制 Markdown 内部元素横向铺满 */
-        .content p, .content ul, .content ol, .content li { width: 100%; display: block; margin: 0 0 1em 0; }
-        .content pre { background: #000; padding: 15px; border-radius: 8px; overflow-x: auto; width: 100%; margin: 15px 0; border: 1px solid var(--border); }
+        /* 核心修复：这个 div 必须占据剩余宽度且不换行 */
+        .content { overflow: hidden; display: block; font-size: 16px; line-height: 1.7; color: var(--text); width: auto; }
+        .content p { margin: 0 0 1em 0; display: block; width: 100%; }
+        .content pre { background: #000; padding: 15px; border-radius: 8px; overflow-x: auto; display: block; width: 100%; margin: 15px 0; border: 1px solid var(--border); }
         
-        /* 推理框样式 */
-        .reasoning-box { background: rgba(255,255,255,0.05); border-left: 4px solid var(--accent); padding: 15px; margin-bottom: 15px; border-radius: 6px; color: #999; font-size: 14px; width: 100%; }
+        .reasoning-box { background: rgba(255,255,255,0.05); border-left: 4px solid var(--accent); padding: 15px; margin-bottom: 15px; border-radius: 6px; color: #999; font-size: 14px; display: block; clear: both; }
 
-        /* 5. 输入区样式 */
-        .input-area { width: 100%; padding: 20px 0 40px; background: linear-gradient(transparent, var(--bg) 50%); position: absolute; bottom: 0; }
-        .input-wrapper { max-width: 850px; margin: 0 auto; width: 92%; background: #2f2f2f; border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-        textarea { width: 100%; border: none; outline: none; background: transparent; color: white; font-size: 16px; resize: none; max-height: 200px; padding-bottom: 30px; line-height: 1.5; }
+        /* 输入区固定在底部 */
+        .input-area { position: fixed; bottom: 0; right: 0; left: 260px; padding: 20px 0 40px; background: linear-gradient(transparent, var(--bg) 50%); }
+        .input-wrapper { max-width: 800px; margin: 0 auto; background: #2f2f2f; border: 1px solid var(--border); border-radius: 14px; padding: 12px; position: relative; }
+        textarea { width: 100%; border: none; outline: none; background: transparent; color: white; font-size: 16px; resize: none; min-height: 24px; max-height: 200px; padding-bottom: 30px; }
         
-        .toolbar { position: absolute; bottom: 12px; right: 16px; display: flex; gap: 15px; align-items: center; }
-        #action-btn { background: var(--accent); color: white; border: none; padding: 6px 18px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .toolbar { position: absolute; bottom: 10px; right: 15px; }
+        #action-btn { background: var(--accent); color: white; border: none; padding: 6px 18px; border-radius: 6px; cursor: pointer; font-weight: bold; }
         #action-btn.stop { background: #ef4444; }
-        .file-btn { cursor: pointer; opacity: 0.7; font-size: 18px; }
     </style>
 </head>
 <body>
 
 <div class="sidebar">
-    <div class="logo"><span>LibreTV</span> <span style="color:#fff">AI</span></div>
+    <div class="logo">LibreTV AI</div>
     <div class="new-chat-btn" onclick="startNewChat()">+ 开启新对话</div>
     <div id="history-container"></div>
 </div>
@@ -79,7 +64,7 @@
             <div class="message-row">
                 <div class="message-inner">
                     <div class="avatar ai-avatar">R</div>
-                    <div class="content">你好！架构已重写，文字现在应该正常横向显示了。</div>
+                    <div class="content">布局模式已切换为“传统隔离块”。如果文字还是竖着的，请务必检查浏览器是否有极简模式或强制缩放。</div>
                 </div>
             </div>
         </div>
@@ -89,7 +74,6 @@
         <div class="input-wrapper">
             <textarea id="userInput" placeholder="输入消息..." rows="1"></textarea>
             <div class="toolbar">
-                <label class="file-btn">📎<input type="file" id="fileInput" hidden onchange="handleFile(this)"></label>
                 <button id="action-btn" onclick="handleAction()">发送</button>
             </div>
         </div>
@@ -97,18 +81,67 @@
 </div>
 
 <script>
-    // 变量初始化
+    // 1. 初始化变量
     let currentChatId = "chat_" + Date.now();
     let messages = [];
     let controller = null;
 
+    // 2. 页面加载历史
     window.onload = loadHistory;
 
     function handleAction() {
-        if (document.getElementById('action-btn').innerText === '发送') sendMessage();
+        const btn = document.getElementById('action-btn');
+        if (btn.innerText === '发送') sendMessage();
         else if (controller) controller.abort();
     }
 
+    // 3. 核心加载历史函数（修复点击没反应的问题）
+    async function loadHistory() {
+        try {
+            const res = await fetch('/history');
+            const list = await res.json();
+            const container = document.getElementById('history-container');
+            container.innerHTML = list.map(item => `
+                <div class="history-item" onclick="loadChat('${item.chatId}')">💬 ${item.title || '历史对话'}</div>
+            `).join('');
+        } catch (e) { console.error("加载历史失败", e); }
+    }
+
+    // 4. 加载具体对话（补全了之前可能缺失的逻辑）
+    async function loadChat(chatId) {
+        currentChatId = chatId;
+        const msgContainer = document.getElementById('msg-container');
+        msgContainer.innerHTML = '<div style="padding:20px; opacity:0.5">正在加载...</div>';
+        
+        try {
+            const res = await fetch('/history', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ chatId }) 
+            });
+            const data = await res.json();
+            messages = data.messages;
+            msgContainer.innerHTML = '';
+            
+            messages.forEach(msg => {
+                if (msg.role === 'assistant' && msg.reasoning_content) {
+                    appendReasoning(msg.reasoning_content);
+                }
+                appendRow(msg.role, msg.content);
+            });
+        } catch (e) { 
+            msgContainer.innerHTML = '<div style="color:red">历史内容读取失败</div>';
+        }
+    }
+
+    function appendReasoning(text) {
+        const row = document.createElement('div');
+        row.className = 'message-row';
+        row.innerHTML = `<div class="message-inner"><div class="reasoning-box"><b>🤔 推理过程：</b><br>${text}</div></div>`;
+        document.getElementById('msg-container').appendChild(row);
+    }
+
+    // 5. 发送消息逻辑
     async function sendMessage() {
         const input = document.getElementById('userInput');
         const text = input.value.trim();
@@ -168,7 +201,7 @@
                                 aiDiv.innerHTML = marked.parse(fullText);
                                 aiDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
                             }
-                            document.getElementById('chat-window').scrollTop = document.getElementById('chat-window').scrollHeight;
+                            window.scrollTo(0, document.body.scrollHeight);
                         } catch (e) {}
                     }
                 }
@@ -188,11 +221,7 @@
     function createAiRow() {
         const row = document.createElement('div');
         row.className = 'message-row';
-        row.innerHTML = `
-            <div class="message-inner">
-                <div class="avatar ai-avatar">R</div>
-                <div class="content active-text">...</div>
-            </div>`;
+        row.innerHTML = `<div class="message-inner"><div class="avatar ai-avatar">R</div><div class="content active-text">...</div></div>`;
         document.getElementById('msg-container').appendChild(row);
         return row;
     }
@@ -200,23 +229,9 @@
     function appendRow(role, text) {
         const row = document.createElement('div');
         row.className = 'message-row';
-        row.innerHTML = `
-            <div class="message-inner">
-                <div class="avatar ${role==='user'?'user-avatar':'ai-avatar'}">${role==='user'?'U':'R'}</div>
-                <div class="content">${marked.parse(text)}</div>
-            </div>`;
+        row.innerHTML = `<div class="message-inner"><div class="avatar ${role==='user'?'user-avatar':'ai-avatar'}">${role==='user'?'U':'R'}</div><div class="content">${marked.parse(text)}</div></div>`;
         document.getElementById('msg-container').appendChild(row);
-        document.getElementById('chat-window').scrollTop = document.getElementById('chat-window').scrollHeight;
-    }
-
-    async function loadHistory() {
-        try {
-            const res = await fetch('/history');
-            const list = await res.json();
-            document.getElementById('history-container').innerHTML = list.map(item => `
-                <div class="history-item" onclick="loadChat('${item.chatId}')">💬 ${item.title || '新对话'}</div>
-            `).join('');
-        } catch (e) {}
+        window.scrollTo(0, document.body.scrollHeight);
     }
 
     function startNewChat() { location.reload(); }
